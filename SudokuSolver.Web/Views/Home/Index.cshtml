@@ -1,0 +1,167 @@
+﻿@{
+    ViewBag.Title = "Sudoku";
+}
+
+<div class="page-controls">
+    <div>
+        <label>Length of Sudoku:</label>
+        <input type="number" id="sudoku-length" min="1" step="1" />
+        <div id="sudoku-length-error"></div>
+    </div>
+    <div>
+        <button id="solve-btn">Solve</button>
+        <button id="clear">Clear</button>
+        <button id="clear-all">Clear All</button>
+    </div>
+</div>
+
+<div class="grid-container" id="sudoku-grid-container">
+    <!-- Sudoku grid will be generated here -->
+</div>
+
+@section scripts {
+    <script type="text/javascript">
+        $(document).ready(function () {
+            $("#sudoku-length").change(function () {
+                var length = parseInt($(this).val());
+                var sqrtLength = Math.sqrt(length);
+                if (sqrtLength != sqrtLength.toFixed(0)) {
+                    $("#sudoku-length-error").text("Please enter a integer that is a perfect square");
+                    return;
+                }
+                $("#sudoku-length-error").text('');
+                $("#sudoku-grid-container").html('<table></table>');
+                var $table = $("#sudoku-grid-container table");
+                for (var i = 0; i < length; ++i) {
+                    $table.append("<tr></tr>");
+                    var $row = $table.find("tr:last");
+                    var rowStyle = i % sqrtLength == 0 ? 'major-grid-line-row ' : '';
+                    for (var j = 0; j < length; ++j) {
+                        var colStyle = j % sqrtLength == 0 ? 'major-grid-line-col ' : '';
+                        $row.append("<td class='" + rowStyle + colStyle + "'><input /></td>");
+                    }
+                }
+                $table.find("input").change(function () {
+                    var $input = $(this);
+                    var value = parseInt($input.val(), 10);
+                    if (value == undefined || isNaN(value) || value <= 0 || value > length) {
+                        $input.val('');
+                    }
+                    $input.addClass("fixed-value");
+                }).keydown(function (e) {
+                    if (e.keyCode == 37 /* Left */) {
+                        $(this).parent("td").prev("td").find("input").focus();
+                    }
+                    if (e.keyCode == 39 /* Right */) {
+                        $(this).parent("td").next("td").find("input").focus();
+                    }
+                    if (e.keyCode == 38 /* Up */) {
+                        var $td = $(this).parent("td");
+                        var $tr = $td.parent("tr");
+                        var index = $tr.children("td").index($td);
+                        $tr.prev("tr").children("td").eq(index).find("input").focus();
+                    }
+                    if (e.keyCode == 40 /* Down */) {
+                        var $td = $(this).parent("td");
+                        var $tr = $td.parent("tr");
+                        var index = $tr.children("td").index($td);
+                        $tr.next("tr").children("td").eq(index).find("input").focus();
+                    }
+                });
+            });
+
+            $("#solve-btn").click(function () {
+                var $table = $("#sudoku-grid-container table");
+                var puzzle = [];
+                $table.find("tr").each(function (i) {
+                    var row = [];
+                    $(this).find("td").each(function (i) {
+                        var value = parseInt($(this).find("input").val(), 10);
+                        if (isNaN(value)) {
+                            row.push(0);
+                        }
+                        else {
+                            row.push(value);
+                        }
+                    });
+                    puzzle.push(row);
+                });
+
+                $.ajax({
+                    url: "/home/_Solve",
+                    type: "POST",
+                    data: { sudoku: puzzle },
+                    success: function (result) {
+                        if (result == null || result == undefined || !result) {
+                            $("#sudoku-length-error").text("There is no possible solution to the puzzle");
+                        }
+                        var $rows = $("#sudoku-grid-container table tr");
+                        for (var i = 0; i < result.length; ++i) {
+                            var $cols = $rows.eq(i).find("td");
+                            for (var j = 0; j < result[i].length; ++j) {
+                                $cols.eq(j).find("input").val(result[i][j]);
+                            }
+                        }
+                    }
+                }).fail(function (xhr) {
+
+                });
+            });
+
+            $("#clear").click(function () {
+                $("#sudoku-grid-container table td input:not(.fixed-value)").val('');
+            });
+
+            $("#clear-all").click(function () {
+                $("#sudoku-grid-container table td input").val('');
+            });
+        });
+    </script>
+}
+
+@section styles{
+    <style type="text/css">
+        *, *:before, *:after {
+            font-family: Arial, Helvetica, sans-serif;
+        }
+
+        #solve-btn {
+            margin-top: 15px;
+            font-size: 1.1rem;
+        }
+
+        #sudoku-length-error {
+            color: red;
+        }
+
+        .grid-container {
+            padding: 20px;
+        }
+
+            .grid-container table {
+                border-collapse: collapse;
+                border: 2px solid black;
+            }
+
+            .grid-container tr td input {
+                width: 1.5rem;
+                height: 1.5rem;
+                font-size: 1rem;
+                line-height: 1.5rem;
+                text-align: center;
+                vertical-align: central;
+            }
+
+        .major-grid-line-col {
+            border-left: 2px solid black;
+        }
+
+        .major-grid-line-row {
+            border-top: 2px solid black;
+        }
+
+        .fixed-value {
+            font-weight: bold;
+        }
+    </style>
+}
